@@ -1,0 +1,79 @@
+# ── File biên dịch, build ───────────────────────────────────────────
+*.class
+*.jar
+# Giữ thư viện của project (Gson, MySQL, BCrypt) để máy khác mở là chạy được
+!lib/*.jar
+*.war
+*.ear
+*.nar
+build/
+dist/
+target/
+out/
+
+# ── IDE ─────────────────────────────────────────────────────────────
+.idea/
+.vscode/
+*.iml
+*.ipr
+*.iws
+.classpath
+.project
+.settings/
+nbproject/private/
+nbbuild/
+nbdist/
+.nb-gradle/
+.claude/
+
+# ── Hệ điều hành, file tạm ──────────────────────────────────────────
+.DS_Store
+Thumbs.db
+desktop.ini
+*.swp
+*.swo
+*~
+*.tmp
+*.temp
+*.bak
+*.backup
+
+# ── Log ─────────────────────────────────────────────────────────────
+*.log
+logs/
+
+# ── CSDL cục bộ ─────────────────────────────────────────────────────
+*.db
+*.sqlite
+*.sqlite3
+
+# ── Cấu hình có mật khẩu DB / địa chỉ IP riêng ──────────────────────
+# Chỉ đẩy bản mẫu *.example; người clone về chép ra rồi điền thông tin của mình
+src/fw/server/resources/server.properties
+src/fw/client/resources/client.properties
+
+# ── Asset gốc ───────────────────────────────────────────────────────
+# Game không đọc thư mục này: ảnh cần dùng đã chép vào src/fw/client/resources/gfx
+assets/
+
+# ── Ảnh cũ không còn dùng (đã thay bằng giao diện Lost Lamb) ────────
+src/fw/client/resources/fireboy.jpg
+src/fw/client/resources/watergirl.jpg
+src/fw/client/resources/lobby_bg.jpg
+src/fw/client/resources/login_bg.jpg
+
+# ── Tài liệu nháp đã bỏ ─────────────────────────────────────────────
+00_START_HERE.md
+README_READY_TO_DEMO.md
+QUICK_DEMO.md
+PROJECT_STATUS.md
+INDEX.md
+FILE_MANIFEST.md
+src/TONG_HOP_FIX.md
+src/KE_HOACH_DON_GIAN_HOA.md
+src/ke_hoach_sua_code.md
+
+# ── File nén ────────────────────────────────────────────────────────
+*.zip
+*.tar.gz
+*.rar

@@ -1,0 +1,7 @@
+# Chép file này thành client.properties (cùng thư mục)
+# server.host: 127.0.0.1 nếu chạy server trên cùng máy, hoặc IP của máy chạy server (ví dụ IP Radmin)
+
+# Server Configuration
+server.host=127.0.0.1
+tcp.port=5000
+udp.port=5001

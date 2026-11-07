@@ -1,0 +1,10 @@
+# Chép file này thành server.properties (cùng thư mục) rồi điền mật khẩu MySQL của máy bạn
+
+# Database Configuration
+db.url=jdbc:mysql://localhost:3306/fireboy_watergirl?useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true&createDatabaseIfNotExist=true&characterEncoding=UTF-8
+db.user=root
+db.pass=
+
+# Server Configuration
+tcp.port=5000
+udp.port=5001
