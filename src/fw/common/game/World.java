@@ -424,19 +424,19 @@ public class World {
         float gap = Float.MAX_VALUE;
 
         Rect br = b.rect();
+        float bc = br.x + br.w / 2;
         for (Rock r : rocks) {
             if (grp.contains(r)) continue;
             Rect rr = r.rect();
-            if (!yOverlap(br, rr)) continue;
+            // Chồng nhau theo chiều dọc thật sự (> 1 px): đứng trên nóc đá thì không tính là đẩy
+            if (!(br.y < rr.y + rr.h - 1 && br.y + br.h > rr.y + 1)) continue;
+            // Đá phải nằm phía trước theo hướng đi (so tâm)
+            if (s * (rr.x + rr.w / 2 - bc) <= 0) continue;
 
-            float g;
-            if (s > 0) {
-                g = rr.x - (br.x + br.w);
-                if (g < 0 || g > Math.abs(a)) continue;
-            } else {
-                g = br.x - (rr.x + rr.w);
-                if (g < 0 || g > Math.abs(a)) continue;
-            }
+            // Khoảng hở tới đá. Khi đang áp sát, sai số số thực có thể làm g hơi âm:
+            // vẫn tính là đá chắn đường (trước đây bỏ qua nên người đi xuyên vào đá).
+            float g = s > 0 ? rr.x - (br.x + br.w) : br.x - (rr.x + rr.w);
+            if (g > Math.abs(a)) continue;
 
             if (g < gap) {
                 gap = g;
@@ -449,8 +449,9 @@ public class World {
             return a;
         }
 
-        // Đẩy đá chậm hơn đi bộ; đá dịch được bao nhiêu thì người đi theo bấy nhiêu
-        float pushDist = (Math.abs(a) - gap) * Phys.PUSH_K;
+        // Đẩy đá chậm hơn đi bộ; đá dịch được bao nhiêu thì người đi theo bấy nhiêu.
+        // gap âm (đang lấn vào đá) thì người lùi lại đúng phần lấn, tự về sát mép đá.
+        float pushDist = (Math.abs(a) - Math.max(0, gap)) * Phys.PUSH_K;
         MoveResult rockRes = moveGroup(rock, s * pushDist, 0, false);
         float moved = Math.abs(rockRes.ax);
 

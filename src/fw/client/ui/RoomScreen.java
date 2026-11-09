@@ -110,7 +110,7 @@ public class RoomScreen extends Theme.TempleBackground {
         return c;
     }
 
-    /** Thẻ người chơi: tên, vai, chủ phòng, rồi thống kê từng màn */
+    /** Thẻ người chơi: tên, chủ phòng, thống kê từng màn, rồi ảnh nhân vật */
     private JComponent playerCard(Model.RoomData.Member mem, boolean isHost) {
         boolean fire = "FIRE".equals(mem.el());
         Color tint = fire ? Theme.FIRE : Theme.WATER;
@@ -122,8 +122,6 @@ public class RoomScreen extends Theme.TempleBackground {
         String you = mem.acc() == Model.acc ? " (bạn)" : "";
         top.add(Theme.label(mem.name() + you, Theme.display(22), Theme.PARCHMENT));
         top.add(Box.createVerticalStrut(2));
-        top.add(Theme.label(fire ? "Lửa, lội được dung nham" : "Nước, lội được hồ nước",
-            Theme.bodyBold(13), tint));
         if (isHost) top.add(Theme.label("Chủ phòng", Theme.bodyBold(13), Theme.GILT));
         top.add(Box.createVerticalStrut(10));
         JSeparator sep = new JSeparator();
@@ -147,7 +145,12 @@ public class RoomScreen extends Theme.TempleBackground {
                 stats.add(Box.createVerticalStrut(8));
             }
         }
-        card.content().add(stats, BorderLayout.CENTER);
+        // Thống kê ngay dưới tên, phần trống còn lại bên dưới là ảnh nhân vật
+        JPanel body = new JPanel(new BorderLayout());
+        body.setOpaque(false);
+        body.add(stats, BorderLayout.NORTH);
+        body.add(new CharacterPortrait(fire ? "fireboy" : "watergirl", tint), BorderLayout.CENTER);
+        card.content().add(body, BorderLayout.CENTER);
         return card;
     }
 

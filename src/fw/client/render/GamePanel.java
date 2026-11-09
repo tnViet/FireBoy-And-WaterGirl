@@ -5,16 +5,13 @@ import fw.client.ui.Theme;
 import fw.common.game.Level;
 import fw.common.game.Snap;
 import fw.common.game.Zone;
-import fw.common.util.Log;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 
-import javax.imageio.ImageIO;
 import javax.swing.*;
 import java.awt.*;
 import java.awt.image.BufferedImage;
-import java.io.InputStream;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -29,13 +26,11 @@ import java.util.Map;
  * Hình dáng từng vật thể nằm trong ScenePainter.
  */
 public class GamePanel extends JPanel {
-    private static final String TAG = "PANEL";
     private static final int PW = 24;
     private static final int PH = 30;
-    private static final String RES = "/fw/client/resources/";
+    /** Độ phóng sprite nhân vật (4 px ảnh -> 5 px màn hình): thân cao ~25 px vừa khung 30 px */
+    private static final float SPRITE_SCALE = 1.25f;
 
-    private final SpriteSheet fireboySheet;
-    private final SpriteSheet watergirlSheet;
     private final Map<Integer, PlayerAnimations> playerAnims = new HashMap<>();
     private final ParticleSystem particleSystem = new ParticleSystem();
     private final SoundManager soundManager = new SoundManager();
@@ -59,57 +54,60 @@ public class GamePanel extends JPanel {
     private boolean keyGot;
 
     /** Trạng thái tối thiểu của 1 người chơi trong snapshot trước */
-    private record PlayerState(float x, float dx, boolean alive, boolean done) {}
+    private record PlayerState(float x, float y, float dx, float dy, boolean alive, boolean done) {}
 
-    /** Bộ animation của 1 nhân vật: đứng / đi / nhảy / chết */
+    /**
+     * Một animation kèm điểm neo trong ảnh gốc (px):
+     * ax = tâm thân theo chiều ngang, footY = mép dưới bàn chân.
+     * Điểm neo được đặt trùng giữa-đáy khung va chạm của người chơi.
+     */
+    private record Clip(Animation anim, float ax, int footY) {}
+
+    /**
+     * Bộ animation của 1 nhân vật, ảnh trong gfx/char/<tên>_*.png (bản gốc hướng mặt sang phải):
+     *   idle  24 khung 30x30 | run 10 khung 30x30
+     *   jump  28 khung 30x30: 1-12 bay lên, 14-25 rơi xuống
+     *   death 20 khung 40x50 (khung cuối trống)
+     */
     private static class PlayerAnimations {
-        final Animation idle, walk, jump, death;
-        Animation current;
+        final Clip idle, run, rise, fall, death;
+        Clip current;
 
-        PlayerAnimations(SpriteSheet sheet) {
-            idle  = new Animation(row(sheet, 0), 15, true);
-            walk  = new Animation(row(sheet, 1), 8,  true);
-            jump  = new Animation(row(sheet, 2), 5,  false);
-            death = new Animation(row(sheet, 3), 10, false);
+        PlayerAnimations(String who) {
+            idle  = new Clip(new Animation(strip(who + "_idle.png",  30, 30, 0, 24), 5, true),  14.5f, 28);
+            run   = new Clip(new Animation(strip(who + "_run.png",   30, 30, 0, 10), 4, true),  14.5f, 28);
+            rise  = new Clip(new Animation(strip(who + "_jump.png",  30, 30, 1, 13), 4, true),  14.5f, 28);
+            fall  = new Clip(new Animation(strip(who + "_jump.png",  30, 30, 14, 26), 4, true), 14.5f, 28);
+            death = new Clip(new Animation(strip(who + "_death.png", 40, 50, 0, 19), 4, false), 19.5f, 48);
             current = idle;
         }
 
-        private static BufferedImage[] row(SpriteSheet sheet, int row) {
-            BufferedImage[] frames = new BufferedImage[sheet.getCols()];
-            for (int c = 0; c < frames.length; c++) frames[c] = sheet.getFrame(c, row);
+        /** Cắt các khung [from, to) của dải ảnh 1 hàng; thiếu ảnh thì trả mảng rỗng */
+        private static BufferedImage[] strip(String file, int fw, int fh, int from, int to) {
+            BufferedImage img = Gfx.img("char/" + file);
+            if (img == null) return new BufferedImage[0];
+            SpriteSheet sheet = new SpriteSheet(img, fw, fh);
+            BufferedImage[] frames = new BufferedImage[to - from];
+            for (int i = 0; i < frames.length; i++) frames[i] = sheet.getFrame(from + i);
             return frames;
         }
 
-        /** Ưu tiên: chết > đang bay > đang đi > đứng yên */
-        void update(float dx, boolean inAir, boolean alive) {
-            Animation next = !alive ? death : inAir ? jump : Math.abs(dx) > 0.1 ? walk : idle;
+        /** Ưu tiên: chết > đang bay (lên / xuống) > đang chạy > đứng yên */
+        void update(float dx, float dy, boolean inAir, boolean alive) {
+            Clip next = !alive ? death
+                      : inAir ? (dy < 0 ? rise : fall)
+                      : Math.abs(dx) > 0.1 ? run : idle;
             if (next != current) {
                 current = next;
-                current.reset();
+                current.anim().reset();
             }
-            current.update();
+            current.anim().update();
         }
     }
 
     public GamePanel() {
         setOpaque(true);
         setBackground(Theme.NIGHT);
-        // Sprite sheet; nếu chưa có file PNG thì tự sinh hình tạm trong bộ nhớ
-        BufferedImage fb = loadImg("fireboy_sprite.png");
-        BufferedImage wg = loadImg("watergirl_sprite.png");
-        fireboySheet   = new SpriteSheet(fb != null ? fb : SpriteGenerator.generateFireboy(), 32, 48);
-        watergirlSheet = new SpriteSheet(wg != null ? wg : SpriteGenerator.generateWatergirl(), 32, 48);
-    }
-
-    private BufferedImage loadImg(String name) {
-        for (String path : new String[]{RES + name, "/" + name}) {
-            try (InputStream in = getClass().getResourceAsStream(path)) {
-                if (in != null) return ImageIO.read(in);
-            } catch (Exception e) {
-                Log.warn(TAG, "Cannot load image: " + path);
-            }
-        }
-        return null;
     }
 
     @Override
@@ -325,6 +323,7 @@ public class GamePanel extends JPanel {
             // So sánh với snapshot trước: chết / về đích
             PlayerState prev = prevPlayers.get(acc);
             float dx = prev == null ? 0 : newSnap ? x - prev.x() : prev.dx();
+            float dy = prev == null ? 0 : newSnap ? y - prev.y() : prev.dy();
             if (prev != null) {
                 if (prev.alive() && !alive) {
                     particleSystem.addExplosion(x + PW / 2f, y + PH / 2f, tint, 25);
@@ -335,13 +334,13 @@ public class GamePanel extends JPanel {
                     soundManager.play("win");
                 }
             }
-            prevPlayers.put(acc, new PlayerState(x, dx, alive, done));
+            prevPlayers.put(acc, new PlayerState(x, y, dx, dy, alive, done));
             // đã vào cửa thì không vẽ nữa
             if (done) continue;
 
             PlayerAnimations anim = playerAnims.computeIfAbsent(acc,
-                k -> new PlayerAnimations(isFire ? fireboySheet : watergirlSheet));
-            anim.update(dx, inAir, alive);
+                k -> new PlayerAnimations(isFire ? "fireboy" : "watergirl"));
+            anim.update(dx, dy, inAir, alive);
 
             // quầng sáng quanh nhân vật
             if (alive) {
@@ -349,13 +348,30 @@ public class GamePanel extends JPanel {
                 g.setColor(Theme.alpha(tint, a));
                 g.fillOval((int) x - 6, (int) y - 6, PW + 12, PH + 12);
             }
-            BufferedImage frame = anim.current.getCurrentFrame();
-            if (frame != null) {
-                // face < 0 thì lật ngang ảnh (vẽ với bề rộng âm)
-                if (face < 0) g.drawImage(frame, (int) x + PW, (int) y, -PW, PH, null);
-                else          g.drawImage(frame, (int) x, (int) y, PW, PH, null);
-            }
+            drawSprite(g, anim.current, x, y, face < 0, tint);
         }
+    }
+
+    /** Vẽ khung hiện tại của clip, neo giữa-đáy vào khung va chạm; thiếu ảnh thì vẽ khối màu */
+    private static void drawSprite(Graphics2D g, Clip clip, float x, float y, boolean flip, Color tint) {
+        BufferedImage frame = clip.anim().getCurrentFrame();
+        if (frame == null) {
+            g.setColor(tint);
+            g.fillRoundRect((int) x, (int) y, PW, PH, 8, 8);
+            return;
+        }
+        int fw = frame.getWidth(), fh = frame.getHeight();
+        int dw = Math.round(fw * SPRITE_SCALE), dh = Math.round(fh * SPRITE_SCALE);
+        // lật ngang thì điểm neo cũng lật theo
+        float ax = flip ? fw - clip.ax() : clip.ax();
+        int sx = Math.round(x + PW / 2f - ax * SPRITE_SCALE);
+        int sy = Math.round(y + PH - clip.footY() * SPRITE_SCALE);
+
+        Object old = g.getRenderingHint(RenderingHints.KEY_INTERPOLATION);
+        g.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_NEAREST_NEIGHBOR);
+        if (flip) g.drawImage(frame, sx, sy, sx + dw, sy + dh, fw, 0, 0, fh, null);
+        else      g.drawImage(frame, sx, sy, sx + dw, sy + dh, 0, 0, fw, fh, null);
+        if (old != null) g.setRenderingHint(RenderingHints.KEY_INTERPOLATION, old);
     }
 
     // ── Thanh trên cùng: tên màn, trạng thái chìa khóa, đồng hồ ─────────
